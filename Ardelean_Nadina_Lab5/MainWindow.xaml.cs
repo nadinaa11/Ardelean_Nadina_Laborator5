@@ -13,13 +13,16 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Data.Entity;
+using System.Data;
+using Nume_Pren_Lab5;
+
 
 namespace Ardelean_Nadina_Lab5
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    /// 
     enum ActionState
     {
         New,
@@ -29,33 +32,39 @@ namespace Ardelean_Nadina_Lab5
     }
     public partial class MainWindow : Window
     {
-        //Using AutoLotModel;
         ActionState action = ActionState.Nothing;
-        AutoLotEntitiesModel ctx = new AutoLotEntitiesModel();
+        public AutoLotEntitiesModel ctx = new AutoLotEntitiesModel();
         CollectionViewSource customerVSource;
+        CollectionViewSource inventoryVSource;
+        CollectionViewSource customerOrdersVSource;
         public MainWindow()
         {
             InitializeComponent();
             DataContext = this;
-
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            //using System.Data.Entity;
-            customerVSource =
-((System.Windows.Data.CollectionViewSource)(this.FindResource("customerViewSource")));
-            customerVSource.Source = ctx.Customers.Local;
-            ctx.Customers.Load();
 
             System.Windows.Data.CollectionViewSource customerViewSource = ((System.Windows.Data.CollectionViewSource)(this.FindResource("customerViewSource")));
             // Load data by setting the CollectionViewSource.Source property:
             // customerViewSource.Source = [generic data source]
+            System.Windows.Data.CollectionViewSource inventoryViewSource = ((System.Windows.Data.CollectionViewSource)(this.FindResource("inventoryViewSource")));
+            // Load data by setting the CollectionViewSource.Source property:
+            // inventoryViewSource.Source = [generic data source]
+            customerVSource = ((System.Windows.Data.CollectionViewSource)(this.FindResource("customerViewSource")));
+            customerVSource.Source = ctx.Customers.Local;
+            ctx.Customers.Load();
 
-            customerOrdersVSource =
-((System.Windows.Data.CollectionViewSource)(this.FindResource("customerOrdersViewSource")));
+            customerVSource.View.MoveCurrentToFirst();
+
+            inventoryVSource = ((System.Windows.Data.CollectionViewSource)(this.FindResource("inventoryViewSource")));
+            inventoryVSource.Source = ctx.Inventories.Local;
+            ctx.Inventories.Load();
+            customerOrdersVSource = ((System.Windows.Data.CollectionViewSource)(this.FindResource("customerOrdersViewSource")));
 
             //customerOrdersVSource.Source = ctx.Orders.Local;
+            BindDataGrid();
             ctx.Orders.Load();
             ctx.Inventories.Load();
             cmbCustomers.ItemsSource = ctx.Customers.Local;
@@ -64,34 +73,35 @@ namespace Ardelean_Nadina_Lab5
             cmbInventory.ItemsSource = ctx.Inventories.Local;
             //cmbInventory.DisplayMemberPath = "Make";
             cmbInventory.SelectedValuePath = "CarId";
-            BindDataGrid();
+
         }
-
-
-        private void btnNew_Click(object sender, RoutedEventArgs e)
+        private void btnAdd_Click(object sender, RoutedEventArgs e)
         {
             action = ActionState.New;
+            BindingOperations.ClearBinding(firstNameTextBox, TextBox.TextProperty);
+            BindingOperations.ClearBinding(lastNameTextBox, TextBox.TextProperty);
+            SetValidationBinding();
         }
-
         private void btnEdit_Click(object sender, RoutedEventArgs e)
         {
             action = ActionState.Edit;
+            BindingOperations.ClearBinding(firstNameTextBox, TextBox.TextProperty);
+            BindingOperations.ClearBinding(lastNameTextBox, TextBox.TextProperty);
+            SetValidationBinding();
         }
-
         private void btnDelete_Click(object sender, RoutedEventArgs e)
         {
             action = ActionState.Delete;
         }
-
         private void btnNext_Click(object sender, RoutedEventArgs e)
         {
             customerVSource.View.MoveCurrentToNext();
-
+            inventoryVSource.View.MoveCurrentToNext();
         }
-
-        private void btnPrev_Click(object sender, RoutedEventArgs e)
+        private void btnPrevious_Click(object sender, RoutedEventArgs e)
         {
-            customerVSource.View.MoveCurrentToNext();
+            customerVSource.View.MoveCurrentToPrevious();
+            inventoryVSource.View.MoveCurrentToPrevious();
         }
         private void SaveCustomers()
         {
@@ -151,31 +161,21 @@ namespace Ardelean_Nadina_Lab5
 
         }
 
-        private void btnNext1_Click(object sender, RoutedEventArgs e)
-        {
-            customerVSource.View.MoveCurrentToNext1();
-        }
-        
-
-        private void btnPrev1_Click(object sender, RoutedEventArgs e)
-        {
-            customerVSource.View.MoveCurrentToPrev1();
-        }
         private void SaveInventory()
         {
-            Invetory inventory = null;
+            Inventory inventory = null;
             if (action == ActionState.New)
             {
                 try
                 {
-                    //instantiem Inventory entity
-                    inventory = new inventory()
+                    //instantiem Customer entity
+                    inventory = new Inventory()
                     {
-                        FirstName = firstNameTextBox.Text.Trim(),
-                        LastName = lastNameTextBox.Text.Trim()
+                        Make = makeTextBox.Text.Trim(),
+                        Color = colorTextBox.Text.Trim()
                     };
                     //adaugam entitatea nou creata in context
-                    ctx.Inventory.Add(inventory);
+                    ctx.Inventories.Add(inventory);
                     inventoryVSource.View.Refresh();
                     //salvam modificarile
                     ctx.SaveChanges();
@@ -192,8 +192,8 @@ namespace Ardelean_Nadina_Lab5
                 try
                 {
                     inventory = (Inventory)inventoryDataGrid.SelectedItem;
-                    inventory.FirstName = firstNameTextBox.Text.Trim();
-                    inventory.LastName = lastNameTextBox.Text.Trim();
+                    inventory.Make = makeTextBox.Text.Trim();
+                    inventory.Color = colorTextBox.Text.Trim();
                     //salvam modificarile
                     ctx.SaveChanges();
                 }
@@ -207,45 +207,43 @@ namespace Ardelean_Nadina_Lab5
                 try
                 {
                     inventory = (Inventory)inventoryDataGrid.SelectedItem;
-                    ctx.Inventory.Remove(inventory);
+                    ctx.Inventories.Remove(inventory);
                     ctx.SaveChanges();
                 }
                 catch (DataException ex)
                 {
                     MessageBox.Show(ex.Message);
                 }
-                inventoryVSource.View.Refresh();
+                customerVSource.View.Refresh();
             }
-            private void gbOperations_Click(object sender, RoutedEventArgs e)
-            {
-                Button SelectedButton = (Button)e.OriginalSource;
-                Panel panel = (Panel)SelectedButton.Parent;
-
-                foreach (Button B in panel.Children.OfType<Button>())
-                {
-                    if (B != SelectedButton)
-                        B.IsEnabled = false;
-                }
-                gbActions.IsEnabled = true;
-            }
-            private void ReInitialize()
-            {
-
-                Panel panel = gbOperations.Content as Panel;
-                foreach (Button B in panel.Children.OfType<Button>())
-                {
-                    B.IsEnabled = true;
-                }
-                gbActions.IsEnabled = false;
-            }
-            private void btnCancel_Click(object sender, RoutedEventArgs e)
-            {
-                ReInitialize();
-            }
-
 
         }
+        private void gbOperations_Click(object sender, RoutedEventArgs e)
+        {
+            Button SelectedButton = (Button)e.OriginalSource;
+            Panel panel = (Panel)SelectedButton.Parent;
 
+            foreach (Button B in panel.Children.OfType<Button>())
+            {
+                if (B != SelectedButton)
+                    B.IsEnabled = false;
+            }
+            gbActions.IsEnabled = true;
+        }
+        private void ReInitialize()
+        {
+
+            Panel panel = gbOperations.Content as Panel;
+            foreach (Button B in panel.Children.OfType<Button>())
+            {
+                B.IsEnabled = true;
+            }
+            gbActions.IsEnabled = false;
+        }
+        private void btnCancel_Click(object sender, RoutedEventArgs e)
+        {
+            ReInitialize();
+        }
         private void btnSave_Click(object sender, RoutedEventArgs e)
         {
             TabItem ti = tbCtrlAutoLot.SelectedItem as TabItem;
@@ -272,7 +270,7 @@ namespace Ardelean_Nadina_Lab5
                 {
                     Customer customer = (Customer)cmbCustomers.SelectedItem;
                     Inventory inventory = (Inventory)cmbInventory.SelectedItem;
-                    //instantiem Order entity
+                    //instantiem Order entity 
                     order = new Order()
                     {
 
@@ -333,26 +331,51 @@ namespace Ardelean_Nadina_Lab5
                 {
                     MessageBox.Show(ex.Message);
                 }
-                private void BindDataGrid()
-                {
-                    var queryOrder = from ord in ctx.Orders
-                                     join cust in ctx.Customers on ord.CustId equals
-                                     cust.CustId
-                                     join inv in ctx.Inventories on ord.CarId
-                         equals inv.CarId
-                                     select new
-                                     {
-                                         ord.OrderId,
-                                         ord.CarId,
-                                         ord.CustId,
-                                         cust.FirstName,
-                                         cust.LastName,
-                                         inv.Make,
-                                         inv.Color
-                                     };
-                    customerOrdersVSource.Source = queryOrder.ToList();
-                }
             }
         }
+        private void BindDataGrid()
+        {
+            var queryOrder = from ord in ctx.Orders
+                             join cust in ctx.Customers on ord.CustId equals
+                             cust.CustId
+                             join inv in ctx.Inventories on ord.CarId
+                 equals inv.CarId
+                             select new
+                             {
+                                 ord.OrderId,
+                                 ord.CarId,
+                                 ord.CustId,
+                                 cust.FirstName,
+                                 cust.LastName,
+                                 inv.Make,
+                                 inv.Color
+                             };
+            customerOrdersVSource.Source = queryOrder.ToList();
+        }
+        private void SetValidationBinding()
+        {
+            Binding firstNameValidationBinding = new Binding();
+            firstNameValidationBinding.Source = customerVSource;
+            firstNameValidationBinding.Path = new PropertyPath("FirstName");
+            firstNameValidationBinding.NotifyOnValidationError = true;
+            firstNameValidationBinding.Mode = BindingMode.TwoWay;
+            firstNameValidationBinding.UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged;
+            //string required 
+            firstNameValidationBinding.ValidationRules.Add(new StringNotEmpty());
+            firstNameTextBox.SetBinding(TextBox.TextProperty, firstNameValidationBinding);
+
+            Binding lastNameValidationBinding = new Binding();
+            lastNameValidationBinding.Source = customerVSource;
+            lastNameValidationBinding.Path = new PropertyPath("LastName");
+            lastNameValidationBinding.NotifyOnValidationError = true;
+            lastNameValidationBinding.Mode = BindingMode.TwoWay;
+            lastNameValidationBinding.UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged;
+            //string min length validator 
+            lastNameValidationBinding.ValidationRules.Add(new StringMinLengthValidator());
+            lastNameTextBox.SetBinding(TextBox.TextProperty, lastNameValidationBinding); //setare binding nou 
+
+        }
+
+
     }
 }
